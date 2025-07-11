@@ -1,4 +1,4 @@
-// recipe-suggestion.ts
+
 'use server';
 
 /**
@@ -25,12 +25,20 @@ const RecipeSuggestionInputSchema = z.object({
 });
 export type RecipeSuggestionInput = z.infer<typeof RecipeSuggestionInputSchema>;
 
+const RecipeSchema = z.object({
+    title: z.string().describe("The name of the recipe."),
+    description: z.string().describe("A short, enticing description of the recipe."),
+    ingredients: z.array(z.string()).describe("A list of ingredients for the recipe."),
+    steps: z.array(z.string()).describe("The step-by-step instructions for preparing the recipe."),
+    servings: z.string().describe("The number of servings the recipe makes, e.g., '2 porsi'."),
+    prepTime: z.string().describe("The estimated preparation time, e.g., '15 menit'."),
+});
+
 const RecipeSuggestionOutputSchema = z.object({
-  suggestions: z
-    .string()
-    .describe('A list of recipe suggestions based on the provided ingredients and tools.'),
+  suggestions: z.array(RecipeSchema).describe('A list of recipe suggestions based on the provided ingredients and tools.'),
 });
 export type RecipeSuggestionOutput = z.infer<typeof RecipeSuggestionOutputSchema>;
+
 
 export async function recipeSuggestion(input: RecipeSuggestionInput): Promise<RecipeSuggestionOutput> {
   return recipeSuggestionFlow(input);
@@ -46,7 +54,10 @@ const recipeSuggestionPrompt = ai.definePrompt({
   The user has the following cooking tools: {{{cookingTools}}}
 
   Suggest some recipes that the user can make with these ingredients and tools. Be creative and consider simple recipes that are suitable for students living in dorms.
-  Format your response as a list of recipe suggestions.`,
+  
+  Provide a description that is short and appealing. Keep the ingredients list and steps simple and clear.
+  
+  Generate between 2 to 3 recipes.`,
 });
 
 const recipeSuggestionFlow = ai.defineFlow(

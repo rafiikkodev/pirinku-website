@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { recipeSuggestion } from "@/ai/flows/recipe-suggestion";
+import { recipeSuggestion, type RecipeSuggestionOutput } from "@/ai/flows/recipe-suggestion";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,10 +21,7 @@ const formSchema = z.object({
   cookingTools: z.string().min(3, { message: "Sebutkan setidaknya satu alat, misal: panci, kompor." }),
 });
 
-type Recipe = {
-  title: string;
-  content: string;
-};
+type Recipe = RecipeSuggestionOutput["suggestions"][0];
 
 export function RecipeFinder() {
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
@@ -44,23 +42,8 @@ export function RecipeFinder() {
     setError(null);
     try {
       const result = await recipeSuggestion(values);
-      if (result && result.suggestions) {
-        const parsedSuggestions = result.suggestions
-          .split(/\n\s*\n/)
-          .map((s) => {
-            const lines = s.trim().split('\n');
-            const title = lines[0]?.replace(/[*#]/g, '').trim();
-            const content = lines.slice(1).join('\n').trim();
-            return { title, content };
-          })
-          .filter(r => r.title && r.content);
-
-        if (parsedSuggestions.length > 0) {
-            setSuggestions(parsedSuggestions);
-        } else {
-            setError("AI tidak memberikan resep yang valid. Coba ganti bahan atau alatmu.");
-        }
-
+      if (result && result.suggestions && result.suggestions.length > 0) {
+        setSuggestions(result.suggestions);
       } else {
         setError("Tidak ada resep yang ditemukan. Coba ganti bahan atau alatmu.");
       }
@@ -141,7 +124,7 @@ export function RecipeFinder() {
                 <div className="space-y-4">
                     <h2 className="text-xl font-bold font-headline text-center text-primary">Ini dia idenya!</h2>
                     {suggestions.map((recipe, index) => (
-                        <RecipeCard key={index} title={recipe.title} content={recipe.content} />
+                        <RecipeCard key={index} recipe={recipe} />
                     ))}
                 </div>
             )}
