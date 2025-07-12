@@ -1,7 +1,17 @@
+
+'use client';
+
 import { RecipeFinder } from '@/components/recipe-finder';
 import { ChefHat } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   return (
     <div className="flex flex-col items-center min-h-screen p-4 antialiased">
       <div className="absolute inset-0 -z-10 h-full w-full bg-background bg-[radial-gradient(#d2d2d2_1px,transparent_1px)] dark:bg-[radial-gradient(#404040_1px,transparent_1px)] [background-size:16px_16px]"></div>
@@ -21,7 +31,7 @@ export default function Home() {
       </header>
 
       <main className="w-full max-w-2xl mx-auto flex-grow">
-        <RecipeFinder />
+        {isClient ? <RecipeFinder /> : null}
       </main>
 
       <footer className="w-full max-w-4xl mx-auto py-6 text-center text-muted-foreground text-xs md:text-sm">
