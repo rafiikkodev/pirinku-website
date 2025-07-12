@@ -31,8 +31,8 @@ export function RecipeFinder() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ingredients: "",
-      cookingTools: "",
+      ingredients: "mie instan, telur, nasi, sosis, bakso, bawang merah, bawang putih, cabai, garam, gula, merica, minyak goreng, saus sambal, kecap manis",
+      cookingTools: "rice cooker, teflon, panci, kompor, pisau, talenan, sendok, garpu",
     },
   });
 
