@@ -9,15 +9,14 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Plus, X, Mic, MicOff } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Loader2, Sparkles, Mic, MicOff, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { RecipeSuggestionInput } from "@/ai/flows/recipe-suggestion";
 
 const formSchema = z.object({
   ingredients: z.string().min(3, { message: "Sebutkan setidaknya satu bahan, misal: telur, nasi." }),
-  cookingTools: z.string().min(3, { message: "Sebutkan setidaknya satu alat masak, misal: teflon." }),
+  cookingTools: z.string().min(3, { message: "Pilih setidaknya satu alat masak." }),
 });
 
 interface RecipeFormProps {
@@ -25,9 +24,15 @@ interface RecipeFormProps {
   isLoading: boolean;
 }
 
+const PREDEFINED_TOOLS = [
+  "Teflon", "Panci", "Kompor", "Rice Cooker", "Microwave",
+  "Pisau", "Talenan", "Spatula", "Mangkuk", "Piring", "Sendok", "Garpu"
+];
+const TOOL_FREQUENCY_KEY = 'pirinku-tool-frequency';
+
 export function RecipeForm({ onSubmit, isLoading }: RecipeFormProps) {
-  const [cookingTools, setCookingTools] = useState<string[]>([]);
-  const [newTool, setNewTool] = useState("");
+  const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
+  const [sortedTools, setSortedTools] = useState(PREDEFINED_TOOLS);
   const [isListening, setIsListening] = useState(false);
   const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(false);
   
@@ -77,6 +82,19 @@ export function RecipeForm({ onSubmit, isLoading }: RecipeFormProps) {
       
       recognitionRef.current = recognition;
     }
+
+    // Load frequencies and sort tools
+    try {
+        const storedFrequencies = localStorage.getItem(TOOL_FREQUENCY_KEY);
+        const frequencies: Record<string, number> = storedFrequencies ? JSON.parse(storedFrequencies) : {};
+        
+        const toolsToSort = [...PREDEFINED_TOOLS];
+        toolsToSort.sort((a, b) => (frequencies[b] || 0) - (frequencies[a] || 0));
+        setSortedTools(toolsToSort);
+    } catch (error) {
+        console.error("Failed to access localStorage for tool frequencies:", error);
+        setSortedTools(PREDEFINED_TOOLS);
+    }
   }, [form, toast]);
 
   const handleToggleListening = () => {
@@ -93,32 +111,35 @@ export function RecipeForm({ onSubmit, isLoading }: RecipeFormProps) {
     }
     setIsListening(prev => !prev);
   };
-  
-  const handleAddTool = () => {
-    const toolToAdd = newTool.trim().toLowerCase();
-    if (toolToAdd && !cookingTools.includes(toolToAdd)) {
-      const newTools = [...cookingTools, toolToAdd];
-      setCookingTools(newTools);
-      form.setValue('cookingTools', newTools.join(', '));
-      form.clearErrors('cookingTools');
-      setNewTool("");
-    }
-  };
 
-  const handleRemoveTool = (toolToRemove: string) => {
-    const newTools = cookingTools.filter(tool => tool !== toolToRemove);
-    setCookingTools(newTools);
-    form.setValue('cookingTools', newTools.join(', '));
-  };
-  
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTool();
+  const handleToolToggle = (tool: string) => {
+    const newSelectedTools = new Set(selectedTools);
+    if (newSelectedTools.has(tool)) {
+      newSelectedTools.delete(tool);
+    } else {
+      newSelectedTools.add(tool);
     }
+    setSelectedTools(newSelectedTools);
+    
+    const toolsString = Array.from(newSelectedTools).join(', ');
+    form.setValue('cookingTools', toolsString, { shouldValidate: true });
   };
   
   const onFormSubmit = (values: z.infer<typeof formSchema>) => {
+    // Update tool frequencies in localStorage
+    try {
+      const storedFrequencies = localStorage.getItem(TOOL_FREQUENCY_KEY);
+      const frequencies: Record<string, number> = storedFrequencies ? JSON.parse(storedFrequencies) : {};
+
+      selectedTools.forEach(tool => {
+        frequencies[tool] = (frequencies[tool] || 0) + 1;
+      });
+
+      localStorage.setItem(TOOL_FREQUENCY_KEY, JSON.stringify(frequencies));
+    } catch (error) {
+      console.error("Failed to update tool frequencies in localStorage:", error);
+    }
+    
     onSubmit(values);
   };
 
@@ -160,25 +181,25 @@ export function RecipeForm({ onSubmit, isLoading }: RecipeFormProps) {
 
           <FormItem>
             <FormLabel className="font-bold text-lg text-foreground/90">Alat masak yang tersedia?</FormLabel>
-             <div className="flex gap-2">
-                <Input 
-                    value={newTool}
-                    onChange={(e) => setNewTool(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Contoh: teflon, lalu tekan 'Tambah'"
-                />
-                <Button type="button" onClick={handleAddTool} className="flex-shrink-0"><Plus className="mr-2 h-4 w-4"/> Tambah</Button>
-             </div>
-             <div className="flex flex-wrap gap-2 pt-2 min-h-[2.5rem]">
-                {cookingTools.map(tool => (
-                    <Badge key={tool} variant="secondary" className="text-base py-1 pl-3 pr-1 capitalize">
-                        {tool}
-                        <button type="button" onClick={() => handleRemoveTool(tool)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20 text-destructive">
-                            <X className="h-3 w-3" />
-                        </button>
-                    </Badge>
-                ))}
-             </div>
+            <FormControl>
+                <div className="flex flex-wrap gap-2 pt-2">
+                    {sortedTools.map(tool => {
+                        const isSelected = selectedTools.has(tool);
+                        return (
+                            <Button
+                                type="button"
+                                key={tool}
+                                variant={isSelected ? "default" : "outline"}
+                                onClick={() => handleToolToggle(tool)}
+                                className={cn("rounded-full", isSelected && "border-primary-foreground/50")}
+                            >
+                                {isSelected && <Check className="mr-2 h-4 w-4" />}
+                                {tool}
+                            </Button>
+                        )
+                    })}
+                </div>
+            </FormControl>
              <FormMessage>{form.formState.errors.cookingTools?.message}</FormMessage>
           </FormItem>
         </div>
