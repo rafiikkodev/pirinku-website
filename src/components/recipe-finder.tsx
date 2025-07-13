@@ -98,7 +98,7 @@ export function RecipeFinder() {
         }
       };
 
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: any) => {
           let errorMessage = "Terjadi kesalahan pada pengenalan suara.";
           if (event.error === 'no-speech') {
               errorMessage = "Tidak ada suara yang terdeteksi. Coba lagi.";
