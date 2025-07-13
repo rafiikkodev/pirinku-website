@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Utensils, Clock, Users, Salad, ListOrdered } from "lucide-react";
+import Image from "next/image";
 
 type Recipe = RecipeSuggestionOutput["suggestions"][0];
 
@@ -13,7 +14,18 @@ interface RecipeCardProps {
 
 export function RecipeCard({ recipe }: RecipeCardProps) {
   return (
-    <Card className="bg-background/80 dark:bg-card/60 backdrop-blur-sm transition-all hover:shadow-lg hover:border-primary/40">
+    <Card className="bg-background/80 dark:bg-card/60 backdrop-blur-sm transition-all hover:shadow-lg hover:border-primary/40 overflow-hidden">
+      {recipe.imageUrl && (
+        <div className="relative w-full h-48">
+          <Image
+            src={recipe.imageUrl}
+            alt={`Gambar ${recipe.title}`}
+            layout="fill"
+            objectFit="cover"
+            data-ai-hint="recipe food"
+          />
+        </div>
+      )}
       <CardHeader className="pb-4">
         <CardTitle className="flex items-start gap-4 text-xl font-headline text-primary">
             <Utensils className="h-7 w-7 mt-1 shrink-0" />
