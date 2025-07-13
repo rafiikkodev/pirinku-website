@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,18 +11,45 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Sparkles, AlertCircle, Plus, X } from "lucide-react";
+import { Loader2, Sparkles, AlertCircle, Plus, X, Mic, MicOff } from "lucide-react";
 import { RecipeCard } from "./recipe-card";
 import { RecipeSkeletons } from "./recipe-skeletons";
 import { Separator } from "./ui/separator";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   ingredients: z.string().min(3, { message: "Sebutkan setidaknya satu bahan, misal: telur, nasi." }),
 });
 
 type Recipe = RecipeSuggestionOutput["suggestions"][0];
+
+// Define the SpeechRecognition interface for TypeScript
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: (event: any) => void;
+  onerror: (event: any) => void;
+  onend: () => void;
+}
+
+interface SpeechRecognitionStatic {
+  new (): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: SpeechRecognitionStatic;
+    webkitSpeechRecognition: SpeechRecognitionStatic;
+  }
+}
+
 
 export function RecipeFinder() {
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
@@ -31,12 +58,78 @@ export function RecipeFinder() {
   const [cookingTools, setCookingTools] = useState<string[]>([]);
   const [newTool, setNewTool] = useState("");
 
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const { toast } = useToast();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       ingredients: "",
     },
   });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      // Browser doesn't support SpeechRecognition
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'id-ID';
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      const currentIngredients = form.getValues("ingredients");
+      form.setValue("ingredients", currentIngredients ? `${currentIngredients}, ${transcript}` : transcript);
+    };
+
+    recognition.onerror = (event) => {
+        let errorMessage = "Terjadi kesalahan pada pengenalan suara.";
+        if (event.error === 'no-speech') {
+            errorMessage = "Tidak ada suara yang terdeteksi. Coba lagi.";
+        } else if (event.error === 'not-allowed') {
+            errorMessage = "Izin menggunakan mikrofon ditolak. Aktifkan di pengaturan browser.";
+        }
+        toast({
+            variant: "destructive",
+            title: "Voice Command Gagal",
+            description: errorMessage,
+        });
+        setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+  }, [form, toast]);
+
+
+  const handleToggleListening = () => {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+        toast({
+            variant: "destructive",
+            title: "Fitur Tidak Didukung",
+            description: "Browser Anda tidak mendukung fitur voice command.",
+        });
+        return;
+    }
+
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+    setIsListening(!isListening);
+  };
 
   const handleAddTool = () => {
     if (newTool.trim() !== "" && !cookingTools.includes(newTool.trim().toLowerCase())) {
@@ -100,11 +193,24 @@ export function RecipeFinder() {
                   <FormItem>
                     <FormLabel className="font-bold text-lg text-foreground/90">Bahan yang kamu punya?</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Contoh: mie instan, telur, bawang putih, sosis..."
-                        className="resize-none"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Textarea
+                          placeholder="Contoh: mie instan, telur, bawang putih, sosis..."
+                          className="resize-none pr-12"
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant={isListening ? "destructive" : "outline"}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
+                          onClick={handleToggleListening}
+                          disabled={!recognitionRef.current}
+                        >
+                          {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                          <span className="sr-only">{isListening ? "Berhenti Merekam" : "Mulai Merekam"}</span>
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
