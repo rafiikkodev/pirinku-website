@@ -24,19 +24,17 @@ const formSchema = z.object({
 
 type Recipe = RecipeSuggestionOutput["suggestions"][0];
 
-const defaultCookingTools = ["rice cooker", "teflon", "panci", "kompor", "pisau", "talenan", "sendok", "garpu"];
-
 export function RecipeFinder() {
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cookingTools, setCookingTools] = useState<string[]>(defaultCookingTools);
+  const [cookingTools, setCookingTools] = useState<string[]>([]);
   const [newTool, setNewTool] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ingredients: "mie instan, telur, nasi, sosis, bakso, bawang merah, bawang putih, cabai, garam, gula, merica, minyak goreng, saus sambal, kecap manis",
+      ingredients: "",
     },
   });
 
@@ -123,7 +121,7 @@ export function RecipeFinder() {
                     />
                     <Button type="button" onClick={handleAddTool}><Plus className="mr-2"/> Tambah</Button>
                  </div>
-                 <div className="flex flex-wrap gap-2 pt-2">
+                 <div className="flex flex-wrap gap-2 pt-2 min-h-[2.5rem]">
                     {cookingTools.map(tool => (
                         <Badge key={tool} variant="secondary" className="text-base py-1 pl-3 pr-1">
                             {tool}
