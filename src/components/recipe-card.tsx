@@ -1,10 +1,13 @@
 
+import { useState, useEffect } from "react";
 import type { RecipeSuggestionOutput } from "@/ai/flows/recipe-suggestion";
+import { generateRecipeImage } from "@/ai/flows/image-generation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Utensils, Clock, Users, Salad, ListOrdered } from "lucide-react";
+import { Utensils, Clock, Users, Salad, ListOrdered, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
+import { Skeleton } from "./ui/skeleton";
 
 type Recipe = RecipeSuggestionOutput["suggestions"][0];
 
@@ -13,19 +16,58 @@ interface RecipeCardProps {
 }
 
 export function RecipeCard({ recipe }: RecipeCardProps) {
+  const [imageUrl, setImageUrl] = useState(recipe.imageUrl);
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchImage() {
+      try {
+        const result = await generateRecipeImage({ title: recipe.title });
+        if (isMounted && result.imageUrl) {
+          setImageUrl(result.imageUrl);
+        }
+      } catch (error) {
+        console.error("Failed to generate recipe image:", error);
+        // Keep the placeholder if image generation fails
+      } finally {
+        if (isMounted) {
+          setIsImageLoading(false);
+        }
+      }
+    }
+
+    fetchImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [recipe.title]);
+  
   return (
     <Card className="bg-background/80 dark:bg-card/60 backdrop-blur-sm transition-all hover:shadow-lg hover:border-primary/40 overflow-hidden">
-      {recipe.imageUrl && (
-        <div className="relative w-full h-48">
-          <Image
-            src={recipe.imageUrl}
-            alt={`Gambar ${recipe.title}`}
-            layout="fill"
-            objectFit="cover"
-            data-ai-hint="recipe food"
-          />
-        </div>
-      )}
+      <div className="relative w-full h-48 bg-muted">
+        {isImageLoading ? (
+            <div className="w-full h-full flex items-center justify-center">
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <ImageIcon className="h-8 w-8 animate-pulse" />
+                    <p className="text-sm">Membuat gambar...</p>
+                </div>
+            </div>
+        ) : (
+          imageUrl && (
+            <Image
+              src={imageUrl}
+              alt={`Gambar ${recipe.title}`}
+              layout="fill"
+              objectFit="cover"
+              data-ai-hint="recipe food"
+            />
+          )
+        )}
+      </div>
+
       <CardHeader className="pb-4">
         <CardTitle className="flex items-start gap-4 text-xl font-headline text-primary">
             <Utensils className="h-7 w-7 mt-1 shrink-0" />
