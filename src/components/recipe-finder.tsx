@@ -11,37 +11,71 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { Loader2, Sparkles, AlertCircle, Plus, X } from "lucide-react";
 import { RecipeCard } from "./recipe-card";
 import { RecipeSkeletons } from "./recipe-skeletons";
 import { Separator } from "./ui/separator";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
 
 const formSchema = z.object({
   ingredients: z.string().min(3, { message: "Sebutkan setidaknya satu bahan, misal: telur, nasi." }),
-  cookingTools: z.string().min(3, { message: "Sebutkan setidaknya satu alat, misal: panci, kompor." }),
 });
 
 type Recipe = RecipeSuggestionOutput["suggestions"][0];
+
+const defaultCookingTools = ["rice cooker", "teflon", "panci", "kompor", "pisau", "talenan", "sendok", "garpu"];
 
 export function RecipeFinder() {
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cookingTools, setCookingTools] = useState<string[]>(defaultCookingTools);
+  const [newTool, setNewTool] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       ingredients: "mie instan, telur, nasi, sosis, bakso, bawang merah, bawang putih, cabai, garam, gula, merica, minyak goreng, saus sambal, kecap manis",
-      cookingTools: "rice cooker, teflon, panci, kompor, pisau, talenan, sendok, garpu",
     },
   });
 
+  const handleAddTool = () => {
+    if (newTool.trim() !== "" && !cookingTools.includes(newTool.trim().toLowerCase())) {
+      setCookingTools([...cookingTools, newTool.trim().toLowerCase()]);
+      setNewTool("");
+    }
+  };
+
+  const handleRemoveTool = (toolToRemove: string) => {
+    setCookingTools(cookingTools.filter(tool => tool !== toolToRemove));
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTool();
+    }
+  };
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (cookingTools.length === 0) {
+        form.setError("root", { type: "manual", message: "Sebutkan setidaknya satu alat masak." });
+        return;
+    }
+    
     setIsLoading(true);
     setSuggestions([]);
     setError(null);
+    form.clearErrors("root");
+
+    const submissionData = {
+        ...values,
+        cookingTools: cookingTools.join(', '),
+    };
+
     try {
-      const result = await recipeSuggestion(values);
+      const result = await recipeSuggestion(submissionData);
       if (result && result.suggestions && result.suggestions.length > 0) {
         setSuggestions(result.suggestions);
       } else {
@@ -60,7 +94,7 @@ export function RecipeFinder() {
       <CardHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-6">
               <FormField
                 control={form.control}
                 name="ingredients"
@@ -78,23 +112,29 @@ export function RecipeFinder() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="cookingTools"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-bold text-lg text-foreground/90">Alat masak yang tersedia?</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Contoh: rice cooker, teflon, panci..."
-                        className="resize-none"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-2">
+                <FormLabel className="font-bold text-lg text-foreground/90">Alat masak yang tersedia?</FormLabel>
+                 <div className="flex gap-2">
+                    <Input 
+                        value={newTool}
+                        onChange={(e) => setNewTool(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Contoh: saringan"
+                    />
+                    <Button type="button" onClick={handleAddTool}><Plus className="mr-2"/> Tambah</Button>
+                 </div>
+                 <div className="flex flex-wrap gap-2 pt-2">
+                    {cookingTools.map(tool => (
+                        <Badge key={tool} variant="secondary" className="text-base py-1 pl-3 pr-1">
+                            {tool}
+                            <button type="button" onClick={() => handleRemoveTool(tool)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20 text-destructive">
+                                <X className="h-3 w-3" />
+                            </button>
+                        </Badge>
+                    ))}
+                 </div>
+                 {form.formState.errors.root && <p className="text-sm font-medium text-destructive">{form.formState.errors.root.message}</p>}
+              </div>
             </div>
             <Button type="submit" className="w-full font-bold text-base" size="lg" disabled={isLoading}>
               {isLoading ? (
