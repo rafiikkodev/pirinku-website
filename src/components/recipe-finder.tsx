@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,12 +11,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Sparkles, AlertCircle, Plus, X } from "lucide-react";
+import { Loader2, Sparkles, AlertCircle, Plus, X, Mic, MicOff } from "lucide-react";
 import { RecipeCard } from "./recipe-card";
 import { RecipeSkeletons } from "./recipe-skeletons";
 import { Separator } from "./ui/separator";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   ingredients: z.string().min(3, { message: "Sebutkan setidaknya satu bahan, misal: telur, nasi." }),
@@ -30,6 +31,11 @@ export function RecipeFinder() {
   const [error, setError] = useState<string | null>(null);
   const [cookingTools, setCookingTools] = useState<string[]>([]);
   const [newTool, setNewTool] = useState("");
+  const { toast } = useToast();
+
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -37,6 +43,54 @@ export function RecipeFinder() {
       ingredients: "",
     },
   });
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setIsSpeechRecognitionSupported(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'id-ID';
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+        form.setValue('ingredients', transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            toast({
+                variant: 'destructive',
+                title: 'Akses Mikrofon Ditolak',
+                description: 'Mohon izinkan akses mikrofon di pengaturan browser Anda.',
+            });
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognitionRef.current = recognition;
+    }
+  }, [form, toast]);
+
+  const handleToggleListening = () => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+    }
+    setIsListening(!isListening);
+  };
 
   const handleAddTool = () => {
     const toolToAdd = newTool.trim().toLowerCase();
@@ -101,11 +155,25 @@ export function RecipeFinder() {
                   <FormItem>
                     <FormLabel className="font-bold text-lg text-foreground/90">Bahan yang kamu punya?</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Contoh: mie instan, telur, bawang putih..."
-                        className="resize-none"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Textarea
+                          placeholder="Contoh: mie instan, telur, bawang putih..."
+                          className="resize-none pr-12"
+                          {...field}
+                        />
+                        {isSpeechRecognitionSupported && (
+                           <Button
+                            type="button"
+                            size="icon"
+                            variant={isListening ? "destructive" : "outline"}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
+                            onClick={handleToggleListening}
+                           >
+                            {isListening ? <MicOff /> : <Mic />}
+                            <span className="sr-only">{isListening ? 'Stop recording' : 'Start recording'}</span>
+                           </Button>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
