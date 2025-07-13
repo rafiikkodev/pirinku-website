@@ -73,42 +73,39 @@ export function RecipeFinder() {
     if (typeof window === 'undefined') return;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      // Browser doesn't support SpeechRecognition
-      return;
-    }
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'id-ID';
+      recognition.interimResults = false;
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.lang = 'id-ID';
-    recognition.interimResults = false;
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        const currentIngredients = form.getValues("ingredients");
+        form.setValue("ingredients", currentIngredients ? `${currentIngredients}, ${transcript}` : transcript);
+      };
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.trim();
-      const currentIngredients = form.getValues("ingredients");
-      form.setValue("ingredients", currentIngredients ? `${currentIngredients}, ${transcript}` : transcript);
-    };
+      recognition.onerror = (event) => {
+          let errorMessage = "Terjadi kesalahan pada pengenalan suara.";
+          if (event.error === 'no-speech') {
+              errorMessage = "Tidak ada suara yang terdeteksi. Coba lagi.";
+          } else if (event.error === 'not-allowed') {
+              errorMessage = "Izin menggunakan mikrofon ditolak. Aktifkan di pengaturan browser.";
+          }
+          toast({
+              variant: "destructive",
+              title: "Voice Command Gagal",
+              description: errorMessage,
+          });
+          setIsListening(false);
+      };
 
-    recognition.onerror = (event) => {
-        let errorMessage = "Terjadi kesalahan pada pengenalan suara.";
-        if (event.error === 'no-speech') {
-            errorMessage = "Tidak ada suara yang terdeteksi. Coba lagi.";
-        } else if (event.error === 'not-allowed') {
-            errorMessage = "Izin menggunakan mikrofon ditolak. Aktifkan di pengaturan browser.";
-        }
-        toast({
-            variant: "destructive",
-            title: "Voice Command Gagal",
-            description: errorMessage,
-        });
+      recognition.onend = () => {
         setIsListening(false);
-    };
+      };
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
+      recognitionRef.current = recognition;
+    }
   }, [form, toast]);
 
 
@@ -125,10 +122,21 @@ export function RecipeFinder() {
 
     if (isListening) {
       recognition.stop();
+      setIsListening(false);
     } else {
-      recognition.start();
+      try {
+        recognition.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error("Error starting speech recognition:", err);
+        toast({
+            variant: "destructive",
+            title: "Voice Command Gagal",
+            description: "Tidak dapat memulai fitur rekam suara.",
+        });
+        setIsListening(false);
+      }
     }
-    setIsListening(!isListening);
   };
 
   const handleAddTool = () => {
@@ -195,7 +203,7 @@ export function RecipeFinder() {
                     <FormControl>
                       <div className="relative">
                         <Textarea
-                          placeholder="Contoh: mie instan, telur, bawang putih, sosis..."
+                          placeholder="Contoh: mie instan, telur, bawang putih, sosis... atau gunakan ikon mikrofon"
                           className="resize-none pr-12"
                           {...field}
                         />
@@ -205,7 +213,6 @@ export function RecipeFinder() {
                           variant={isListening ? "destructive" : "outline"}
                           className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
                           onClick={handleToggleListening}
-                          disabled={!recognitionRef.current}
                         >
                           {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                           <span className="sr-only">{isListening ? "Berhenti Merekam" : "Mulai Merekam"}</span>
