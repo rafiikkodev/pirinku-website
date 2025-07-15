@@ -33,10 +33,6 @@ export default function Home() {
       <main className="w-full max-w-2xl mx-auto flex-grow">
         {isClient ? <RecipeFinder /> : null}
       </main>
-
-      <footer className="w-full max-w-4xl mx-auto py-6 text-center text-muted-foreground text-xs md:text-sm">
-        <p>Powered by AI ✨ Dibuat untuk para pejuang kos.</p>
-      </footer>
     </div>
   );
 }
