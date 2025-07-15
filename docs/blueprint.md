@@ -1,4 +1,4 @@
-# **App Name**: Pirinku: Kos Recipes
+# **App Name**: Pirinku - Website
 
 ## Core Features:
 

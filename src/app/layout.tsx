@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Pirinku: Kos Recipes',
+  title: 'Pirinku - Website',
   description: 'AI-powered recipe suggestions for students',
 };
 
